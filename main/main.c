@@ -21,15 +21,22 @@ static void tarea_led(void *argumento)
     TickType_t referencia = xTaskGetTickCount();
     const TickType_t intervalo = pdMS_TO_TICKS(CONFIG_SEYTR_PERIODO_MS / 2);
 
+    int64_t tiempo_inicio = esp_timer_get_time();
+
     for (;;) {
         led_conmutar(&s_led);
         
         int64_t tiempo_us = esp_timer_get_time();
-        ESP_LOGI(TAG, "t=%lld us, LED=%s",
-                 (long long)tiempo_us,
-                 s_led.encendido ? "encendido" : "apagado");
-        
+
+        int64_t resta = (tiempo_us - tiempo_inicio)/1000;
+
         xTaskDelayUntil(&referencia, intervalo);
+
+        ESP_LOGI(TAG, "Diferencia=%lld ms, LED=%s",
+                 (long long)resta,
+                 s_led.encendido ? "encendido" : "apagado");
+
+        tiempo_inicio = tiempo_us;
     }
 }
 
