@@ -6,6 +6,7 @@
 #include "sdkconfig.h"
 #include "led.h"
 #include "pines.h"
+#include "esp_log.h"
 
 static const char *TAG = "main";
 
