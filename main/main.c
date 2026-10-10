@@ -6,6 +6,8 @@
 #include "led.h"
 #include "pines.h"
 
+#define CONFIG_SEYTR_PERIODO_MS 1000
+
 static led_t s_led;
 
 static void tarea_led(void *argumento)
