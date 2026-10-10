@@ -19,6 +19,12 @@ static void tarea_led(void *argumento)
 
     for (;;) {
         led_conmutar(&s_led);
+        
+        int64_t tiempo_us = esp_timer_get_time();
+        ESP_LOGI(TAG, "t=%lld us, LED=%s",
+                 (long long)tiempo_us,
+                 s_led.encendido ? "encendido" : "apagado");
+        
         xTaskDelayUntil(&referencia, intervalo);
     }
 }
@@ -26,6 +32,8 @@ static void tarea_led(void *argumento)
 void app_main(void)
 {
     ESP_ERROR_CHECK(led_iniciar(&s_led, PIN_LED, LED_NIVEL_ENCENDIDO));
+    
+    ESP_LOGI(TAG, "#0 encendido t=0.000 ms, origen de la medida");
 
     if (xTaskCreate(tarea_led, "led", 2048, NULL, 5, NULL) != pdPASS) {
         ESP_LOGE("led", "No se pudo crear la tarea");
