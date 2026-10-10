@@ -6,6 +6,8 @@
 #include "led.h"
 #include "pines.h"
 
+static const char *TAG = "main";
+
 #define CONFIG_SEYTR_PERIODO_MS 1000
 
 static led_t s_led;
@@ -32,6 +34,8 @@ static void tarea_led(void *argumento)
 void app_main(void)
 {
     ESP_ERROR_CHECK(led_iniciar(&s_led, PIN_LED, LED_NIVEL_ENCENDIDO));
+    
+    ESP_LOGI(TAG, "TALLER #1");
     
     ESP_LOGI(TAG, "#0 encendido t=0.000 ms, origen de la medida");
 
