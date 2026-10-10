@@ -6,7 +6,7 @@ de la placa antes de conectar los componentes.
 
 | Elemento | GPIO | Uso |
 |---|---:|---|
-|LED|GPIO 5|Entre 3,3V y el pin|
+|LED|GPIO 5|Entre el pin y masa, con su resistencia en serie|
 | LED externo | GPIO5 | La placa lo controla como salida para encenderlo y apagarlo. |
 | Pulsador | GPIO4 | La placa lo lee como entrada para detectar si se presiona. |
 | I2C - SDA | GPIO8 | Línea de datos del bus I2C. |
