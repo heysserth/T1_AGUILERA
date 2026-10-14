@@ -14,3 +14,22 @@ de la placa antes de conectar los componentes.
 
 El LED externo debe conectarse con una resistencia en serie. El mapa también
 muestra un LED RGB integrado en GPIO48; no es el LED externo de esta propuesta.
+
+## Ejercicio 3: sensor BME280
+
+Conecta el sensor con la placa apagada:
+
+| BME280 | ESP32-S3 |
+|---|---|
+| VIN | 3V3 |
+| GND | GND |
+| SDA | GPIO8 |
+| SCL | GPIO9 |
+
+No conectes VIN a 5V. La dirección I2C comprobada en la placa es `0x76`.
+El ejercicio usa la API oficial Bosch para comprobar la identidad del sensor
+y leer sus datos de calibración. Después configura las tres magnitudes con
+sobremuestreo 1x y muestra lecturas compensadas cada dos segundos:
+[BME280 Sensor API](https://github.com/BoschSensortec/BME280_SensorAPI),
+licencia BSD-3-Clause. Los archivos originales y sus avisos de licencia están
+en `components/bme280`.

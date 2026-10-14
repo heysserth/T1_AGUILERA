@@ -5,3 +5,4 @@
 #define PIN_I2C_SDA          GPIO_NUM_8 /* Bus I2C: datos */
 #define PIN_I2C_SCL          GPIO_NUM_9 /* Bus I2C: reloj */
 #define LED_NIVEL_ENCENDIDO  1
+#define BME280_I2C_ADDR  0x76
