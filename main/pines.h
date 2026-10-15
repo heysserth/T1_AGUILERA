@@ -6,3 +6,4 @@
 #define PIN_I2C_SCL          GPIO_NUM_9 /* Bus I2C: reloj */
 #define LED_NIVEL_ENCENDIDO  1
 #define PULSADOR_NIVEL_PULSADO  0
+#define BME280_I2C_ADDR  0x76

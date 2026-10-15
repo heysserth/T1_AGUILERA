@@ -1,3 +1,3 @@
-idf_component_register(SRCS "filtro.c" "main.c" "main_antiguo.c" "Ejercicio1.c"
+idf_component_register(SRCS "main.c" "ejercicio1.c" "ejercicio2.c" "ejercicio3.c"
                     INCLUDE_DIRS "."
-                    REQUIRES led esp_timer pulsador)
+                    REQUIRES led esp_timer pulsador esp_driver_i2c bme280)
