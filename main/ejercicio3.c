@@ -10,7 +10,7 @@
 static const char *TAG = "bme280";
 
 typedef struct {
-    i2c_master_dev_handle_t handle;
+    i2c_master_dev_handle_t handle; /*handle es un puntero a una estructura interna del sistema que representa al BME280 concreto conectado al bus*/
 } bme280_i2c_context_t;
 
 static BME280_INTF_RET_TYPE leer_registro(uint8_t registro, uint8_t *datos,
