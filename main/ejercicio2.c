@@ -1,112 +1,108 @@
+#include <inttypes.h>
 #include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include "driver/gpio.h"
-#include "esp_err.h"
-#include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_log.h"
+
+#include "pulsador.h"
+#include "filtro.h"
 #include "pines.h"
+#include "ejercicio2.h"
 
-#define VENTANA_MS 20
+static const char *TAG = "main";
 
-static const char *TAG = "pulsador";
-static QueueHandle_t cola;
-static portMUX_TYPE mux_perdidos = portMUX_INITIALIZER_UNLOCKED;
-static uint32_t eventos_perdidos;
+#define GUARDA_MS           50     /*Los milisegundos de la ventana de guarda para el antirrebote.*/
+#define CONFIRMACION_MS     20     /*Los milisegundos que espera antes de leer si el botón sigue pulsado.*/
+#define LONGITUD_COLA       10     /*Longitud de la cola de eventos.*/
 
-/* La cola guarda cuándo ocurrió cada flanco. */
-static void isr_pulsador(void *argumento)
+/*Paquete de datos mínimo que la ISR enviará a la tarea*/
+typedef struct {
+    uint32_t pin;
+    int64_t  us;
+} evento_t;
+
+/* La cola de eventos se crea al arrancar, antes de instalar la interrupción,
+ * con su longitud y el tamaño del elemento. */
+static QueueHandle_t s_cola;
+static pulsador_t    s_pulsador;
+
+/*Interrupción que captura los microsegundos y envia por cola sin trazas ni esperas*/
+static void IRAM_ATTR isr_cola(void *arg) 
 {
-    (void)argumento;
-
-    int64_t instante = esp_timer_get_time();
-    BaseType_t despertar = pdFALSE;
-
-    /* La ISR solo toma el tiempo y lo manda a la tarea. */
-    if (xQueueSendFromISR(cola, &instante, &despertar) != pdPASS) {
-        portENTER_CRITICAL_ISR(&mux_perdidos);
-        eventos_perdidos++;
-        portEXIT_CRITICAL_ISR(&mux_perdidos);
-    }
-
-    if (despertar == pdTRUE) {
-        portYIELD_FROM_ISR();
-    }
+    evento_t e = { .pin = (uint32_t)arg,
+                   .us = esp_timer_get_time() };
+    BaseType_t hp = pdFALSE;
+    xQueueSendFromISR(s_cola, &e, &hp); /* meter un dato (e) dentro de una cola desde dentro de una interrupción */
+    if (hp) portYIELD_FROM_ISR(); /*Si hay una tarea de mayor prioridad se cambia a true solo*/
 }
 
-/* Espera por flancos y decide en la tarea si fue una pulsación estable. */
-static void tarea_pulsador(void *argumento)
+/*Esperar a que acabe el rebote y comprobar que sigue pulsado*/
+static bool sigue_pulsado(int64_t instante_us, void *contexto)
+{
+    const pulsador_t *pulsador = contexto;
+    const int64_t falta_us = instante_us - esp_timer_get_time();
+    if (falta_us > 0) {
+        vTaskDelay(pdMS_TO_TICKS((uint32_t)((falta_us + 999) / 1000)) + 1);
+    }
+    return pulsador_pulsado(pulsador);
+}
+
+static void tarea_entrada(void *argumento)
 {
     (void)argumento;
+    evento_t e;
+    uint32_t total = 0;
 
-    int nivel_estable = gpio_get_level(PIN_PULSADOR); /* Suelto = 1. */
-    int64_t ultima_pulsacion_us = 0;
-    uint32_t pulsaciones = 0;
-    int64_t instante;
+    filtro_t filtro = {
+        .guarda_us       = (int64_t)GUARDA_MS * 1000,
+        .confirmacion_us = (int64_t)CONFIRMACION_MS * 1000,
+        .confirmar       = true,
+    };
+    filtro_reiniciar(&filtro);
 
     for (;;) {
-        /* Se bloquea aquí hasta que la ISR ponga un evento en la cola. */
-        xQueueReceive(cola, &instante, portMAX_DELAY);
-
-        /* Informa si se perdió un evento porque la cola estaba llena. */
-        portENTER_CRITICAL(&mux_perdidos);
-        uint32_t perdidos = eventos_perdidos;
-        eventos_perdidos = 0;
-        portEXIT_CRITICAL(&mux_perdidos);
-        if (perdidos > 0) {
-            ESP_LOGW(TAG, "Se perdieron %lu flancos", (unsigned long)perdidos);
+        if (xQueueReceive(s_cola, &e, portMAX_DELAY) == pdTRUE) {
+            const char marca = filtro_flanco(&filtro, e.us, sigue_pulsado, &s_pulsador);
+            if (marca == MARCA_PULSACION) {
+                total++;
+                ESP_LOGI(TAG, "Pulsacion valida: %" PRIu32, total);
+            }
         }
-
-        /* Ignora flancos dentro de la guarda desde la última pulsación contada. */
-        if (ultima_pulsacion_us != 0 &&
-            instante - ultima_pulsacion_us < (int64_t)VENTANA_MS * 1000) {
-            continue;
-        }
-
-        /*
-         * Espera una ventana completa sin nuevos flancos.
-         * Si llega otro, xQueueReceive lo saca y empieza otra espera.
-         */
-        while (xQueueReceive(cola, &instante, pdMS_TO_TICKS(VENTANA_MS)) == pdTRUE) {
-        }
-
-        /* Confirma el estado una vez que el contacto ha dejado de rebotar. */
-        int nivel_actual = gpio_get_level(PIN_PULSADOR);
-
-        /* Solo cuenta el cambio estable de suelto (1) a pulsado (0). */
-        if (nivel_estable == 1 && nivel_actual == 0) {
-            pulsaciones++;
-            ultima_pulsacion_us = esp_timer_get_time();
-            ESP_LOGI(TAG, "Pulsacion valida: %lu", (unsigned long)pulsaciones);
-        }
-
-        /* También recuerda la liberación para poder aceptar la próxima pulsación. */
-        nivel_estable = nivel_actual;
     }
 }
+
 
 void run_ejercicio2(void)
 {
-    /* Cola para guardar instantes mientras la tarea los procesa. */
-    cola = xQueueCreate(32, sizeof(int64_t));
-    ESP_ERROR_CHECK(cola != NULL ? ESP_OK : ESP_ERR_NO_MEM);
+    ESP_LOGI(TAG, "SEyTR - Pulsador por interrupcion con filtro antirrebote");
 
-    /* Entrada con interrupción en ambos flancos y pull-up externa. */
-    const gpio_config_t config = {
-        .pin_bit_mask = 1ULL << PIN_PULSADOR,
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_ANYEDGE,
-    };
-    ESP_ERROR_CHECK(gpio_config(&config));
+    /*Iniciar el componente del pulsador con su pin y lógica física */
+    ESP_ERROR_CHECK(pulsador_iniciar(&s_pulsador, PIN_PULSADOR, PULSADOR_NIVEL_PULSADO));
 
-    /* Instala el servicio y crea la tarea antes de habilitar la interrupción. */
-    ESP_ERROR_CHECK(gpio_install_isr_service(0));
-    if (xTaskCreate(tarea_pulsador, "pulsador", 3072, NULL, 5, NULL) != pdPASS) {
-        ESP_ERROR_CHECK(ESP_FAIL);
+    /*Desactivar resistencia interna: el reposo lo fija la resistencia externa en protoboard */
+    ESP_ERROR_CHECK(pulsador_polarizar(&s_pulsador, false));
+
+    /*Crear la cola antes de activar la interrupción para que no reciba eventos sobre la nada */
+    s_cola = xQueueCreate(LONGITUD_COLA, sizeof(evento_t));
+    if (s_cola == NULL) {
+        ESP_LOGE(TAG, "Error: no hay memoria para crear la cola");
+        return;
     }
-    ESP_ERROR_CHECK(gpio_isr_handler_add(PIN_PULSADOR, isr_pulsador, NULL));
 
-    ESP_LOGI(TAG, "Listo; antirrebote: %d ms", VENTANA_MS);
+    /* El servicio de interrupciones de GPIO se instala una sola vez para todo
+     * el proyecto: diapositiva 12. Con 0, sin ESP_INTR_FLAG_IRAM. */    
+     ESP_ERROR_CHECK(gpio_install_isr_service(0));
+
+    /*Registrar el manejador (ISR) en el pin del pulsador*/
+    ESP_ERROR_CHECK(gpio_isr_handler_add(PIN_PULSADOR, isr_cola, (void *)PIN_PULSADOR));
+
+    /*Crear la tarea que consumirá los eventos y aplicará el filtro (prioridad 10)*/
+    const BaseType_t entrada = xTaskCreate(tarea_entrada, "entrada", 4096, NULL, 10, NULL);
+    if (entrada != pdPASS) {
+        ESP_LOGE(TAG, "no hay memoria para la tarea de entrada");
+        return;
+    }
+
 }
