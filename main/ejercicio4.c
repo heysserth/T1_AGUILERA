@@ -1,10 +1,16 @@
 #include <stdio.h>
 #include <string.h>
-#include "driver/uart.h"
-#include "esp_log.h"
+#include <inttypes.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "driver/uart.h"
+#include "esp_log.h"
+#include "esp_timer.h"
+
+#include "led.h"
+#include "pines.h"
 #include "ejercicio4.h"
 
 static const char *TAG = "consola";
@@ -13,28 +19,40 @@ static const char *TAG = "consola";
 #define BUF_SIZE          256
 #define LINEA_MAX_LEN     64
 
-/* Firma para las funciones que atienden comandos */
+/* Instancia del LED usando el componente oficial del profesor */
+static led_t s_led;
+
+/* Define el formato estandar que debe tener cualquier función de comando.
+permitiendo almacenar funciones dentro de la tabla de comandos*/
 typedef void (*comando_fn_t)(char *args);
 
-/* Estructura para el despacho por tabla */
 typedef struct {
     const char   *nombre;
     const char   *ayuda;
     comando_fn_t  ejecutar;
 } comando_t;
 
-/* Declaración previa de las funciones de comando */
+/* Declaración previa de las funciones de comando. Reciben un char y no devuelven nada */
 static void cmd_ayuda(char *args);
 static void cmd_estado(char *args);
 static void cmd_led(char *args);
 
-/* Tabla de comandos (Requisito explícito de la rúbrica) */
+/* Despacho sobre tabla (Requisito C4) */
 static const comando_t TABLA_COMANDOS[] = {
-    { "ayuda",  "Muestra la lista de comandos disponibles", cmd_ayuda  },
-    { "estado", "Consulta el estado general del sistema",   cmd_estado },
-    { "led",    "Actua sobre el LED (ej: led encender/apagar)", cmd_led},
+    { "ayuda",  "Muestra esta lista de comandos",                cmd_ayuda  },
+    { "estado", "Consulta el estado general del sistema",        cmd_estado },
+    { "led",    "Controla el LED (<on|off> o <1|0>)",            cmd_led    },
 };
 #define NUM_COMANDOS (sizeof(TABLA_COMANDOS) / sizeof(TABLA_COMANDOS[0]))
+
+/* Reutilización de la función en_ms() del profesor para trazas de tiempo */
+static const char *en_ms(int64_t us, char *texto, size_t tamano)
+{
+    if (us < 0) us = 0;
+    snprintf(texto, tamano, "%lld.%03lld", 
+             (long long)(us / 1000), (long long)(us % 1000));
+    return texto;
+}
 
 static void cmd_ayuda(char *args)
 {
@@ -49,9 +67,13 @@ static void cmd_ayuda(char *args)
 static void cmd_estado(char *args)
 {
     (void)args;
+    char tiempo_str[24];
+    en_ms(esp_timer_get_time(), tiempo_str, sizeof(tiempo_str));
+
     printf("\n[ESTADO DEL SISTEMA]\n");
-    printf("  UART0: Conectada a 115200 baudios\n");
-    printf("  Consola: Operativa y respondiendo\n\n");
+    printf("  Tiempo de actividad : %s ms\n", tiempo_str);
+    printf("  Puerto consola      : UART0 a 115200 baudios\n");
+    printf("  Tick de FreeRTOS    : %d Hz\n\n", configTICK_RATE_HZ);
 }
 
 static void cmd_led(char *args)
@@ -61,30 +83,29 @@ static void cmd_led(char *args)
         return;
     }
     if (strcmp(args, "on") == 0 || strcmp(args, "1") == 0) {
-        printf("Comando LED: Activado\n");
+        led_encender(&s_led);
+        printf("LED encendido en GPIO %d\n", (int)PIN_LED);
     } else if (strcmp(args, "off") == 0 || strcmp(args, "0") == 0) {
-        printf("Comando LED: Desactivado\n");
+        led_apagar(&s_led);
+        printf("LED apagado en GPIO %d\n", (int)PIN_LED);
     } else {
         printf("Parametro desconocido '%s'. Use 'on' u 'off'.\n", args);
     }
 }
 
-/* Despachador de comandos sobre la tabla */
+/* Despacho sobre tabla */
 static void despachar_linea(char *linea)
 {
-    /* 1. Recortar espacios iniciales */
     while (*linea == ' ' || *linea == '\t') linea++;
 
-    /* 2. Tratar línea vacía */
+    /* Línea vacía: no hace nada y no produce fallos */
     if (*linea == '\0') {
         return;
     }
 
-    /* 3. Separar comando y argumentos con strtok */
     char *cmd = strtok(linea, " \t");
     char *args = strtok(NULL, "");
 
-    /* 4. Buscar en la tabla de comandos */
     for (size_t i = 0; i < NUM_COMANDOS; i++) {
         if (strcmp(cmd, TABLA_COMANDOS[i].nombre) == 0) {
             TABLA_COMANDOS[i].ejecutar(args);
@@ -92,11 +113,11 @@ static void despachar_linea(char *linea)
         }
     }
 
-    /* 5. Tratar comando desconocido */
-    printf("Comando no reconocido: '%s'. Escriba 'ayuda' para ver la lista.\n", cmd);
+    /* Comando desconocido */
+    printf("Comando no reconocido: '%s'. Escriba 'ayuda' para ver los disponibles.\n", cmd);
 }
 
-/* Tarea de recepción por UART */
+/* Tarea de recepción robusta por UART */
 static void tarea_consola(void *arg)
 {
     (void)arg;
@@ -105,20 +126,22 @@ static void tarea_consola(void *arg)
     size_t indice = 0;
     bool linea_descartada = false;
 
-    printf("\n=== Consola serie lista (escriba 'ayuda') ===\n> ");
+    printf("\n=== Consola serie por UART0 lista ===\n");
+    cmd_ayuda(NULL);
+    printf("> ");
     fflush(stdout);
 
     for (;;) {
-        /* Lee byte a byte sin bloquear la CPU si no hay datos */
+        /* Lectura bloqueante por driver UART de ESP-IDF */
         int len = uart_read_bytes(UART_PORT, &ch, 1, pdMS_TO_TICKS(50));
         if (len <= 0) {
             continue;
         }
 
-        /* Detección de fin de línea: \r (monitor IDF) o \n */
+        /* Fin de línea: \r (monitor de ESP-IDF) o \n */
         if (ch == '\r' || ch == '\n') {
             if (linea_descartada) {
-                printf("\nError: Linea demasiado larga descartada (max %d caracteres).\n> ", LINEA_MAX_LEN - 1);
+                printf("\nError: linea demasiado larga descartada (max %d caracteres).\n> ", LINEA_MAX_LEN - 1);
                 linea_descartada = false;
                 indice = 0;
             } else if (indice > 0) {
@@ -128,23 +151,21 @@ static void tarea_consola(void *arg)
                 indice = 0;
                 printf("> ");
             } else {
-                /* Línea vacía: reimprime prompt */
                 printf("\n> ");
             }
             fflush(stdout);
             continue;
         }
 
-        /* Protección de desbordamiento (descarte de línea larga) */
+        /* Descarte automático si supera el límite de longitud */
         if (indice >= (LINEA_MAX_LEN - 1)) {
             linea_descartada = true;
-            continue; /* Sigue consumiendo hasta encontrar el fin de línea */
+            continue;
         }
 
-        /* Acumular carácter si la línea no está descartada */
+        /* Acumular y eco local */
         if (!linea_descartada) {
             buffer[indice++] = (char)ch;
-            /* Echo local opcional para ver lo que se teclea */
             putchar(ch);
             fflush(stdout);
         }
@@ -153,26 +174,33 @@ static void tarea_consola(void *arg)
 
 void run_ejercicio4(void)
 {
-    /* Configuración básica de UART0 */
+    /* Inicializar el componente del LED */
+    ESP_ERROR_CHECK(led_iniciar(&s_led, PIN_LED, LED_NIVEL_ENCENDIDO));
+
+    /* 1. Configuración de parámetros de la UART0 */
     const uart_config_t uart_config = {
-        .baud_rate = 115200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity    = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .baud_rate  = 115200,
+        .data_bits  = UART_DATA_8_BITS,
+        .parity     = UART_PARITY_DISABLE,
+        .stop_bits  = UART_STOP_BITS_1,
+        .flow_ctrl  = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
-
     ESP_ERROR_CHECK(uart_param_config(UART_PORT, &uart_config));
-    
-    /* Conservar pines nativos de la placa (sin cambios) */
-    ESP_ERROR_CHECK(uart_set_pin(UART_PORT, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, 
+
+    /* 2. Mantener pines nativos de la placa (según paso 1 de la práctica) */
+    ESP_ERROR_CHECK(uart_set_pin(UART_PORT, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE,
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
-    /* Instalar driver sin cola de eventos */
+    /* 3. Instalar el driver de UART en el sistema */
     ESP_ERROR_CHECK(uart_driver_install(UART_PORT, BUF_SIZE * 2, 0, 0, NULL, 0));
 
-    /* Lanzar la tarea de recepción */
-    xTaskCreate(tarea_consola, "tarea_consola", 4096, NULL, 5, NULL);
+    /* 4. Lanzar la tarea de recepción */
+    const BaseType_t res = xTaskCreate(tarea_consola, "consola", 4096, NULL, 5, NULL);
+    if (res != pdPASS) {
+        ESP_LOGE(TAG, "No hay memoria para crear la tarea de consola");
+        return;
+    }
+
     ESP_LOGI(TAG, "Consola UART0 inicializada a 115200 baudios.");
 }
