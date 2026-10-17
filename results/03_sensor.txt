@@ -22,5 +22,14 @@ El dispositivo responde en el bus (0x76) y su registro de identificacion vale
 del propio sensor y son coherentes con el aula (~25 C, ~943 hPa, ~55 % HR).
 
 --- Lectura ante un cambio provocado (mano sobre el sensor) ---
-[PENDIENTE: repetir 'e' con la mano sobre el sensor para ver subir temperatura y
-humedad. La magnitud cambia de forma coherente al provocar el cambio.]
+[ESTADO DEL SISTEMA]
+  Tiempo de actividad : 10486 ms
+  Pulsaciones totales : 0
+  Temperatura   : 27.00 C
+  Presion       : 94313.31 Pa
+  Humedad       : 51.74 %
+  Puerto consola      : UART0 a 115200 baudios
+  Tick de FreeRTOS    : 1000 Hz
+
+Al acercar la mano, la temperatura sube de ~25.2 C a 27.0 C: la medida responde
+de forma coherente al cambio provocado.

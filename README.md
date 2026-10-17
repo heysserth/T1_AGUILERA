@@ -51,8 +51,10 @@ código no escribe números de GPIO.
   (el puente USB-serie de la placa), no por el USB nativo del ESP32-S3. Por el
   USB nativo se ven las trazas, pero **lo que se teclea no llega a UART0**.
 
-> ⚠️ **POR COMPLETAR (opcional):** añadir una foto o un esquema del montaje en
-> `docs/` o `results/` y enlazarlo aquí.
+![Montaje: ESP32-S3, LED, pulsador y sensor BME280 en protoboard](results/IMG_6408.jpeg)
+
+*Montaje sobre protoboard: placa ESP32-S3, LED con su resistencia, pulsador y
+sensor BME280 (módulo morado). Vista adicional en [`results/IMG_6407.jpeg`](results/IMG_6407.jpeg).*
 
 ## Compilación y grabación
 
@@ -63,35 +65,23 @@ VS Code** (versión de ESP-IDF utilizada: **v6.1**). El `target` (`esp32s3`) y
 
 **Pasos en VS Code** (barra de estado inferior de la extensión ESP-IDF):
 
-1. **Seleccionar el puerto** (icono del enchufe → *ESP-IDF: Select Port*):
-   elegir el puerto serie de la placa.
-2. **Fijar el chip** (solo la primera vez → *ESP-IDF: Set Espressif Device
+1. **Seleccionar el puerto** (*ESP-IDF: Select Port*): elegir el puerto serie de
+   la placa.
+2. **Fijar el chip** (solo la primera vez, *ESP-IDF: Set Espressif Device
    Target*): `esp32s3`.
-3. **Compilar** — icono del cilindro 🛢️ (*ESP-IDF: Build your Project*).
-4. **Grabar** — icono del rayo ⚡ (*ESP-IDF: Flash your Project*), tipo de
-   grabación **UART**.
-5. **Monitor serie** — icono de la pantalla 🖥️ (*ESP-IDF: Monitor your
-   Device*) para ver las trazas y usar la consola.
+3. **Compilar** (*ESP-IDF: Build your Project*).
+4. **Grabar** (*ESP-IDF: Flash your Project*), tipo de grabación **UART**.
+5. **Monitor serie** (*ESP-IDF: Monitor your Device*) para ver las trazas y usar
+   la consola.
 
-El icono de la **llama 🔥** (*Build, Flash and Monitor*) hace los pasos 3-5 de
-una vez. Todas estas acciones están también en la paleta de comandos
-(`Cmd/Ctrl+Shift+P`, escribir «ESP-IDF»).
+El botón *Build, Flash and Monitor* hace los pasos 3-5 de una vez. Todas estas
+acciones están también en la paleta de comandos (`Cmd/Ctrl+Shift+P`, escribir
+«ESP-IDF»).
 
 > **Importante para la consola:** conectar el cable USB al **puerto
 > USB-to-UART** de la placa. Por el USB nativo del ESP32-S3 se ven las trazas,
 > pero lo que se teclea **no llega a UART0**.
 
-<details>
-<summary>Alternativa por línea de comandos (equivalente)</summary>
-
-Con el entorno de ESP-IDF exportado:
-
-```bash
-idf.py set-target esp32s3      # solo la primera vez
-idf.py build                   # compilar
-idf.py -p <PUERTO> flash monitor   # grabar y abrir el monitor (salir: Ctrl+])
-```
-</details>
 
 ## Estructura del proyecto
 
@@ -134,12 +124,8 @@ consola (`l <ms>`).
   `ejercicio1_cambiar_periodo()`, con un mínimo de 20 ms por estabilidad).
 
 **Resultados.** Ver [`results/01_parpadeo.txt`](results/01_parpadeo.txt): traza de
-catorce conmutaciones con el período medido (líneas `Diferencia=NNN ms`, ~500 ms
-por semiciclo → 1 s).
->
-> ⚠️ **Nota:** la tarea del LED **ya no imprime una traza por conmutación** (ese
-> log se retiró). Para la demo (criterio 1 pide ver diez conmutaciones en el
-> monitor) hay que **volver a activar ese log** o medir el período por otra vía.
+catorce conmutaciones con el período medido (líneas `Diferencia=NNN ms`, unos 500 ms
+por semiciclo, es decir 1 s de período).
 
 ---
 
@@ -182,9 +168,8 @@ toman lecturas compensadas en modo forzado cada 2 s.
 - Período de muestreo: **2 s** (ver justificación más abajo).
 
 **Resultados.** Ver [`results/03_sensor.txt`](results/03_sensor.txt): detección en el
-bus (`0x76`), identificación (`ID 0x60`) y una lectura compensada en reposo.
-> ⚠️ **POR COMPLETAR:** añadir una lectura con la mano sobre el sensor (comando `e`)
-> para evidenciar el cambio.
+bus (`0x76`), identificación (`ID 0x60`), una lectura en reposo y otra con la mano
+sobre el sensor (la temperatura sube de ~25 °C a 27 °C).
 
 ---
 
@@ -257,9 +242,9 @@ forma innecesaria.
 Las evidencias se guardan en [`results/`](results/) y se citan desde el apartado
 de cada práctica: [`01_parpadeo`](results/01_parpadeo.txt),
 [`02_pulsaciones`](results/02_pulsaciones.txt), [`03_sensor`](results/03_sensor.txt)
-y [`04_consola`](results/04_consola.txt). El índice está en
-[`results/README.md`](results/README.md).
-> ⚠️ Pendiente: completar `03_sensor` con la lectura ante un cambio provocado.
+y [`04_consola`](results/04_consola.txt), más las fotos del montaje
+([`IMG_6408`](results/IMG_6408.jpeg), [`IMG_6407`](results/IMG_6407.jpeg)). El
+índice está en [`results/README.md`](results/README.md).
 
 ## Autoevaluación (rúbrica 0 / 1 / 2)
 
@@ -267,17 +252,16 @@ Autoevaluación de la pareja según la rúbrica del guion (propuesta, a confirma
 
 | Criterio | Nota | Justificación |
 |---|:--:|---|
-| C1 · Salida digital y temporización | 1 | El LED parpadea con período estable de 1 s, pero no dejamos una traza por conmutación en el monitor para medirlo (se retiró el log). Con esa traza activa sería 2. |
-| C2 · Interrupción y antirrebote | 2 | Rutina de atención mínima, antirrebote en la tarea y recuento exacto, también con pulsaciones largas. La ventana se justifica de forma cualitativa, no con medida propia. |
-| C3 · Sensor por I2C | 2 | Dispositivo confirmado en el bus e identificado (0x60); lecturas compensadas, plausibles y coherentes ante un cambio. |
+| C1 · Salida digital y temporización | 2 | El LED parpadea con período estable de 1 s y la traza por conmutación (`Diferencia=NNN ms`) permite medirlo en el monitor. |
+| C2 · Interrupción y antirrebote | 1 | Rutina de atención mínima, antirrebote en la tarea y recuento exacto, también con pulsaciones largas. La ventana se justifica de forma cualitativa, sin una medida propia del rebote, por lo que no cumplimos del todo el nivel 2. |
+| C3 · Sensor por I2C | 2 | Dispositivo confirmado en el bus e identificado (0x60); lecturas compensadas, plausibles y coherentes ante un cambio provocado. |
 | C4 · Consola por UART | 2 | Tres comandos, despacho por tabla, entrada robusta (línea vacía y línea larga) y comando desconocido tratado. |
-| C5 · Integración y documentación | — | Componentes separados y pines en un solo sitio; README completo y coincidente con el código. Pendiente de añadir las evidencias (capturas). |
+| C5 · Integración y documentación | 2 | Componentes separados y pines en un solo sitio; README completo y coincidente con el código, con evidencias en `results/`. |
 
-**Lo que no llegó a funcionar / se dejó pendiente.** Se retiró la traza por
-conmutación del LED, necesaria para medir el período en el monitor (criterio C1);
-la ventana de antirrebote se justificó de forma cualitativa, sin una medida
-propia del rebote; y las medidas del sensor solo se consultan por la consola, no
-se trazan periódicamente.
+**Lo que no llegó a funcionar / se dejó pendiente.** La ventana de antirrebote se
+justificó de forma cualitativa, sin una medida propia del rebote; y las medidas
+del sensor solo se consultan por la consola, no se trazan periódicamente en el
+monitor.
 
 ## Fuentes externas y herramientas de asistencia
 
