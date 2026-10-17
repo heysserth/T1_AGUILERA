@@ -289,10 +289,3 @@ proyecto:
 - Documentación de ESP-IDF (build system, drivers GPIO/I2C/UART, FreeRTOS).
 - Guía de usuario de la placa ESP32-S3-DevKitC-1 (apartado «Description of
   Components», puerto USB-to-UART).
-
-**Herramientas de asistencia de IA.**
-- **Claude Code** (Anthropic): usado para la **redacción del README** y como apoyo
-  en la **depuración e integración** (p. ej. detectar que el muestreo del sensor
-  bloqueaba el arranque de la consola). Las decisiones de diseño, el montaje
-  físico y la adaptación del código son de los integrantes, que mantienen la
-  autoría y la comprensión técnica de lo entregado.
