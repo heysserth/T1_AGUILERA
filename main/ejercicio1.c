@@ -21,6 +21,7 @@ static void tarea_led(void *argumento)
     (void)argumento;
 
     TickType_t referencia = xTaskGetTickCount();
+    int64_t t_anterior_us = esp_timer_get_time(); /* Para medir el tiempo real entre conmutaciones */
 
     for (;;) {
         /* Se calcula el semiciclo según el período actual */
@@ -34,6 +35,14 @@ static void tarea_led(void *argumento)
         /* Solo conmuta si el parpadeo no ha sido pausado por la consola */
         if (s_parpadeo_activo) {
             led_conmutar(&s_led);
+
+            /* Traza con el tiempo medido entre conmutaciones: permite comprobar
+             * el período real sobre la salida del monitor (criterio C1) */
+            const int64_t ahora_us = esp_timer_get_time();
+            ESP_LOGI(TAG, "Diferencia=%lld ms, LED=%s",
+                     (long long)((ahora_us - t_anterior_us) / 1000),
+                     s_led.encendido ? "encendido" : "apagado");
+            t_anterior_us = ahora_us;
         }
     }
 }

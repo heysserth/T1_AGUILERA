@@ -1,0 +1,39 @@
+Evidencia P2 - Consola serie por UART0.
+Sesion desde el monitor: ayuda, estado, control del LED, cambio de periodo y
+tratamiento del comando desconocido.
+
+> h
+
+Comandos disponibles:
+  h        - Muestra esta lista de comandos
+  e        - Consulta el estado general del sistema
+  l        - Controla el LED (<on|off|auto|<periodo>>)
+
+> e
+
+[ESTADO DEL SISTEMA]
+  Tiempo de actividad : 11506 ms
+  Pulsaciones totales : 0
+  Temperatura   : 25.16 C
+  Presion       : 94306.02 Pa
+  Humedad       : 54.84 %
+  Puerto consola      : UART0 a 115200 baudios
+  Tick de FreeRTOS    : 1000 Hz
+
+> l
+Uso:
+  led on          - Enciende fijo
+  led off         - Apaga fijo
+  led auto        - Reanuda parpadeo
+  led <ms>        - Cambia periodo en ms (ej: led 200)
+
+> led 400
+Comando no reconocido: 'led'. Escriba 'h' o 'ayuda' para ver la lista.
+
+> l 600
+Periodo del LED cambiado a 600 ms.
+>
+
+Nota: el comando desconocido ('led') se trata con un mensaje claro y la consola
+sigue respondiendo. La entrada tambien es robusta ante una linea vacia y ante una
+linea mas larga que el limite, que se descarta entera avisando.
