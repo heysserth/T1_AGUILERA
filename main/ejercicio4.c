@@ -11,6 +11,7 @@
 
 #include "ejercicio1.h"
 #include "ejercicio2.h"
+#include "ejercicio3.h"
 #include "ejercicio4.h"
 
 static const char *TAG = "consola";
@@ -53,10 +54,20 @@ static void cmd_estado(char *args)
     (void)args;
     int64_t t_ms = esp_timer_get_time() / 1000;
     uint32_t pulsaciones = ejercicio2_obtener_pulsaciones();
+    bme280_medidas_t m = ejercicio3_obtener_medidas();
 
     printf("\n[ESTADO DEL SISTEMA]\n");
     printf("  Tiempo de actividad : %lld ms\n", (long long)t_ms);
     printf("  Pulsaciones totales : %" PRIu32 "\n", pulsaciones);
+
+    if (m.valido) {
+        printf("  Temperatura   : %.2f C\n", m.temperatura);
+        printf("  Presion       : %.2f Pa\n", m.presion);
+        printf("  Humedad       : %.2f %%\n", m.humedad);
+    } else {
+        printf("  Sensor BME280       : Esperando primera lectura...\n");
+    }
+
     printf("  Puerto consola      : UART0 a 115200 baudios\n");
     printf("  Tick de FreeRTOS    : %d Hz\n\n", configTICK_RATE_HZ);
 }
