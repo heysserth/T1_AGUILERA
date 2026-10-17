@@ -33,7 +33,7 @@ static void cmd_ayuda(char *args);
 static void cmd_estado(char *args);
 static void cmd_led(char *args);
 
-/* Tabla de comandos (Requisito C4) */
+/* Tabla de comandos*/
 static const comando_t TABLA_COMANDOS[] = {
     { "h",  "Muestra esta lista de comandos",            cmd_ayuda  },
     { "e", "Consulta el estado general del sistema",    cmd_estado },
@@ -161,7 +161,7 @@ static void despachar_linea(char *linea)
     printf("Comando no reconocido: '%s'. Escriba 'h' o 'ayuda' para ver la lista.\n", cmd);
 }
 
-/* Tarea de recepción usando el método del profesor: read(STDIN_FILENO) sin instalar drivers */
+/* Tarea de recepción. Basado en la técnica de lectura de consola de tarea_teclado (salida_y_temporizacion.c) */
 static void tarea_consola(void *arg)
 {
     (void)arg;
@@ -210,7 +210,7 @@ static void tarea_consola(void *arg)
             }
         }
 
-        /* Espera no bloqueante idéntica a la del profesor */
+        /* Espera no bloqueante*/
         vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
