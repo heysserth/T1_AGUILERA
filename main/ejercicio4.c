@@ -10,6 +10,7 @@
 #include "esp_timer.h"
 
 #include "ejercicio1.h"
+#include "ejercicio2.h"
 #include "ejercicio4.h"
 
 static const char *TAG = "consola";
@@ -51,9 +52,11 @@ static void cmd_estado(char *args)
 {
     (void)args;
     int64_t t_ms = esp_timer_get_time() / 1000;
+    uint32_t pulsaciones = ejercicio2_obtener_pulsaciones();
 
     printf("\n[ESTADO DEL SISTEMA]\n");
     printf("  Tiempo de actividad : %lld ms\n", (long long)t_ms);
+    printf("  Pulsaciones totales : %" PRIu32 "\n", pulsaciones);
     printf("  Puerto consola      : UART0 a 115200 baudios\n");
     printf("  Tick de FreeRTOS    : %d Hz\n\n", configTICK_RATE_HZ);
 }

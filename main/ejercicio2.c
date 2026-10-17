@@ -11,7 +11,7 @@
 #include "pines.h"
 #include "ejercicio2.h"
 
-static const char *TAG = "main";
+static const char *TAG = "pulsador";
 
 #define GUARDA_MS           50     /*Los milisegundos de la ventana de guarda para el antirrebote.*/
 #define CONFIRMACION_MS     20     /*Los milisegundos que espera antes de leer si el botón sigue pulsado.*/
@@ -27,6 +27,13 @@ typedef struct {
  * con su longitud y el tamaño del elemento. */
 static QueueHandle_t s_cola;
 static pulsador_t    s_pulsador;
+
+/*Implementación para la consola*/
+static uint32_t s_total_pulsaciones = 0;
+uint32_t ejercicio2_obtener_pulsaciones(void)
+{
+    return s_total_pulsaciones;
+}
 
 /*Interrupción que captura los microsegundos y envia por cola sin trazas ni esperas*/
 static void IRAM_ATTR isr_cola(void *arg) 
@@ -53,7 +60,7 @@ static void tarea_entrada(void *argumento)
 {
     (void)argumento;
     evento_t e;
-    uint32_t total = 0;
+    //uint32_t total = 0;
 
     filtro_t filtro = {
         .guarda_us       = (int64_t)GUARDA_MS * 1000,
@@ -66,8 +73,8 @@ static void tarea_entrada(void *argumento)
         if (xQueueReceive(s_cola, &e, portMAX_DELAY) == pdTRUE) {
             const char marca = filtro_flanco(&filtro, e.us, sigue_pulsado, &s_pulsador);
             if (marca == MARCA_PULSACION) {
-                total++;
-                ESP_LOGI(TAG, "Pulsacion valida: %" PRIu32, total);
+                s_total_pulsaciones++;
+                ESP_LOGI(TAG, "Pulsacion valida: %" PRIu32, s_total_pulsaciones);
             }
         }
     }
