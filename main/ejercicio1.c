@@ -14,16 +14,22 @@ static const char *TAG = "led";
 
 static led_t s_led;
 static volatile bool s_parpadeo_activo = true; /* Si está en true, parpadea; si está en false, obedece a la consola */
+static volatile uint32_t s_periodo_ms = CONFIG_SEYTR_PERIODO_MS; /* Variable que almacena el período actual en milisegundos */
 
 static void tarea_led(void *argumento)
 {
     (void)argumento;
 
     TickType_t referencia = xTaskGetTickCount();
-    const TickType_t intervalo = pdMS_TO_TICKS(CONFIG_SEYTR_PERIODO_MS / 2);
 
     for (;;) {
-        xTaskDelayUntil(&referencia, intervalo);
+        /* Se calcula el semiciclo según el período actual */
+        uint32_t semiciclo_ms = s_periodo_ms / 2;
+        if (semiciclo_ms == 0) semiciclo_ms = 1;
+        const TickType_t intervalo_ticks = pdMS_TO_TICKS(semiciclo_ms);
+
+        /* Usar intervalo_ticks (el nuevo), NO intervalo */
+        xTaskDelayUntil(&referencia, intervalo_ticks);
 
         /* Solo conmuta si el parpadeo no ha sido pausado por la consola */
         if (s_parpadeo_activo) {
@@ -32,6 +38,12 @@ static void tarea_led(void *argumento)
     }
 }
 
+void ejercicio1_cambiar_periodo(uint32_t nuevo_periodo_ms)
+{
+    if (nuevo_periodo_ms < 20) nuevo_periodo_ms = 20; // Límite mínimo para estabilidad
+    s_periodo_ms = nuevo_periodo_ms;
+    s_parpadeo_activo = true; // Si estaba pausado, se reanuda con el nuevo período
+}
 
 void run_ejercicio1(void)
 {

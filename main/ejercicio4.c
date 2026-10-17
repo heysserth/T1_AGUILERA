@@ -2,6 +2,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <stdlib.h>
+
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -35,7 +37,7 @@ static void cmd_led(char *args);
 static const comando_t TABLA_COMANDOS[] = {
     { "h",  "Muestra esta lista de comandos",            cmd_ayuda  },
     { "e", "Consulta el estado general del sistema",    cmd_estado },
-    { "l",    "Controla el LED (<on|off|auto>)",           cmd_led    },
+    { "l",    "Controla el LED (<on|off|auto|<periodo>>)",           cmd_led    },
 };
 #define NUM_COMANDOS (sizeof(TABLA_COMANDOS) / sizeof(TABLA_COMANDOS[0]))
 
@@ -110,10 +112,24 @@ static const subcomando_led_t TABLA_SUBCOMANDOS_LED[] = {
 static void cmd_led(char *args)
 {
     if (args == NULL || *args == '\0') {
-        printf("Uso: led <on|off|auto>\n");
+        printf("Uso:\n");
+        printf("  led on          - Enciende fijo\n");
+        printf("  led off         - Apaga fijo\n");
+        printf("  led auto        - Reanuda parpadeo\n");
+        printf("  led <ms>        - Cambia periodo en ms (ej: led 200)\n");
         return;
     }
 
+    /* 1. Comprobar si se ha introducido un número para el período */
+    char *endptr;
+    unsigned long periodo = strtoul(args, &endptr, 10);
+    if (endptr != args && periodo > 0) {
+        ejercicio1_cambiar_periodo((uint32_t)periodo);
+        printf("Periodo del LED cambiado a %lu ms.\n", periodo);
+        return;
+    }
+
+    /* 2. Si no es un número, comprobar la subtabla de subcomandos */
     for (size_t i = 0; i < NUM_SUBCOMANDOS_LED; i++) {
         if (strcmp(args, TABLA_SUBCOMANDOS_LED[i].subcomando) == 0) {
             TABLA_SUBCOMANDOS_LED[i].accion();
@@ -121,7 +137,7 @@ static void cmd_led(char *args)
         }
     }
 
-    printf("Parametro no valido '%s'. Use: on, off o auto.\n", args);
+    printf("Parametro no valido '%s'. Use: on, off, auto o un numero en ms.\n", args);
 }
 
 static void despachar_linea(char *linea)
